@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""pokerbot: one command for the engine and its tools.
+
+  pokerbot play [--debug] [--front] [...]   play autonomously (the engine)
+  pokerbot shadow [--debug]                 you play; the bot decides silently and records both
+  pokerbot results [run-dir]                per-hand results of a run (default: the latest)
+  pokerbot report [run-dir...]              compare your play with the bot's (default: latest run)
+  pokerbot bench [...]                      replay benchmark (bench/run.py options)
+  pokerbot tools --<tool> <png>...          the engine's tools on saved screenshots (pokerbot tools lists them)
+  pokerbot build                            compile the engine
+  pokerbot test                             self-tests: logic, card reader, decider
+  pokerbot config                           show the config file and its values
+  pokerbot version                          the release (or git commit) this is
+
+Settings come from ~/.config/pokerbot/config.toml (key = value lines; created on first run):
+  backend = "claude-cli"   claude-cli (your Claude login), anthropic (API key), or openai (any
+                           OpenAI-compatible endpoint: OpenAI, Ollama, LM Studio, vLLM)
+  model = "opus"           opus/sonnet/haiku for Claude, or the endpoint's model name
+  effort = "low"           Claude's thinking effort: low, medium, high
+  base_url = ""            for openai, e.g. "http://localhost:11434/v1" (Ollama)
+  api_key_env = ""         the environment variable holding the key (ANTHROPIC_API_KEY / OPENAI_API_KEY)
+  output_dir = "/tmp/poker"
+  prompt = ""              a strategy variant file, e.g. "prompts/no-floats.sh"
+Environment variables (POKER_BACKEND, POKER_MODEL, ...) override the file.
+Command-line flags pass straight through to the underlying tool.
+"""
+import glob, os, subprocess, sys
+
+ROOT = os.path.dirname(os.path.realpath(__file__))
+CONFIG = os.path.expanduser("~/.config/pokerbot/config.toml")
+DEFAULTS = {"backend": "claude-cli", "model": "opus", "effort": "low", "base_url": "", "api_key_env": "",
+            "output_dir": "/tmp/poker", "prompt": ""}
+
+
+TOOLS = {"--read-cards": "<png>...  the cards, hand and draws read",
+         "--context": "<png>...  the full context line the model would get",
+         "--read-preflop": "<png>...  seat tags, positions, the chart spot and its play",
+         "--read-seats": "<png>...  the names on the seats",
+         "--read-hud": "<png>...  what the stats-window reader sees",
+         "--results": "<run>  the results ledger of a run",
+         "--selftest": "the engine's logic self-tests",
+         "--build-cards": "<labels> <png-dir> <out>  rebuild cards.txt from labelled screenshots"}
+
+
+def load_config():
+    if not os.path.exists(CONFIG):
+        os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+        with open(CONFIG, "w") as f:
+            f.write("# pokerbot settings\n" + "".join(f'{k} = "{v}"\n' for k, v in DEFAULTS.items()))
+    cfg = dict(DEFAULTS)
+    for line in open(CONFIG):
+        # (a minimal reader: key = "value" lines, # comments)
+        line = line.split("#", 1)[0].strip()
+        if "=" in line:
+            k, v = (x.strip() for x in line.split("=", 1))
+            cfg[k] = v.strip('"').strip("'")
+    return cfg
+
+
+def env_for(cfg):
+    env = dict(os.environ)
+    env.setdefault("POKER_BACKEND", cfg["backend"])
+    env.setdefault("POKER_MODEL", cfg["model"])
+    if cfg.get("base_url"):
+        env.setdefault("POKER_BASE_URL", cfg["base_url"])
+    if cfg.get("api_key_env"):
+        env.setdefault("POKER_API_KEY_ENV", cfg["api_key_env"])
+    env.setdefault("POKER_EFFORT", cfg["effort"])
+    if cfg.get("prompt"):
+        env.setdefault("POKER_PROMPT", os.path.join(ROOT, cfg["prompt"]) if not os.path.isabs(cfg["prompt"]) else cfg["prompt"])
+    return env
+
+
+def latest_run(cfg, need=None):
+    runs = sorted(d for d in glob.glob(os.path.join(cfg["output_dir"], "20*")) if os.path.isdir(d))
+    if need:
+        runs = [d for d in runs if os.path.exists(os.path.join(d, need))]
+    if not runs:
+        sys.exit("no runs found in " + cfg["output_dir"])
+    return runs[-1]
+
+
+def main():
+    args = sys.argv[1:]
+    if not args or args[0] in ("-h", "--help", "help"):
+        print(__doc__); return
+    cmd, rest = args[0], args[1:]
+    cfg = load_config()
+    env = env_for(cfg)
+    engine = os.path.join(ROOT, "engine")
+    if cmd in ("play", "shadow"):
+        extra = ["--shadow"] if cmd == "shadow" else []
+        os.execve(engine, [engine, cfg["output_dir"], *extra, *rest], env)
+    elif cmd == "results":
+        os.execve(engine, [engine, "--results", rest[0] if rest else latest_run(cfg)], env)
+    elif cmd == "report":
+        runs = rest or [latest_run(cfg, need="shadow.tsv")]
+        os.execve(sys.executable, [sys.executable, os.path.join(ROOT, "shadow_report.py"), *runs], env)
+    elif cmd == "bench":
+        os.execve(sys.executable, [sys.executable, os.path.join(ROOT, "bench", "run.py"), *rest], env)
+    elif cmd == "tools":
+        if not rest or not rest[0].startswith("--") or rest[0] not in TOOLS:
+            print("pokerbot tools --<tool> <args>, on saved screenshots:")
+            for flag, what in TOOLS.items():
+                print(f"  {flag:<14} {what}")
+            sys.exit(0 if not rest else 2)
+        os.execve(engine, [engine, *rest], env)
+    elif cmd == "build":
+        if not glob.glob(os.path.join(ROOT, "src", "*.swift")):
+            sys.exit("this is a prebuilt release with no sources; the engine is already built")
+        sys.exit(subprocess.call(["swiftc", "-O", *sorted(glob.glob(os.path.join(ROOT, "src", "*.swift"))), "-o", engine]))
+    elif cmd == "test":
+        ok = subprocess.call([engine, "--selftest"]) == 0
+        fixtures = sorted(glob.glob(os.path.join(ROOT, "tests", "fixtures", "*.png")))
+        got = subprocess.run([engine, "--read-cards", *fixtures], capture_output=True, text=True).stdout
+        want = open(os.path.join(ROOT, "tests", "cards.expected")).read()
+        if got == want:
+            print(f"card reader: {len(fixtures)} fixtures read as expected")
+        else:
+            ok = False
+            print("card reader: FAIL")
+            for g, w in zip(got.splitlines(), want.splitlines()):
+                if g != w:
+                    print(f"  got:  {g}\n  want: {w}")
+        ok = subprocess.call([sys.executable, "-m", "unittest", "-q", "tests/test_python.py"], cwd=ROOT) == 0 and ok
+        sys.exit(0 if ok else 1)
+    elif cmd in ("version", "--version"):
+        path = os.path.join(ROOT, "VERSION")
+        if os.path.exists(path):
+            print(open(path).read().strip())
+        else:
+            subprocess.call(["git", "-C", ROOT, "describe", "--tags", "--always", "--dirty"])
+    elif cmd == "config":
+        print(CONFIG)
+        for k, v in cfg.items():
+            print(f"  {k} = {v!r}")
+    else:
+        sys.exit(f"unknown command '{cmd}' (pokerbot --help)")
+
+
+if __name__ == "__main__":
+    main()

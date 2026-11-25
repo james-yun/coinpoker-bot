@@ -1,0 +1,10 @@
+engine
+*.png
+.DS_Store
+bench/spots/
+bench/results/
+
+!tests/fixtures/*.png
+build/
+dist/
+bench/spots.json

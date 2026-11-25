@@ -1,0 +1,6 @@
+flush-board-turn.png: Your cards: A♠ 9♠ (suited). Board: A♥ K♦ 8♦ T♣ 6♦. Your hand: top pair (As, 9 kicker).
+king-hearts-right-slot.png: Your cards: A♦ K♥ (offsuit). Board: 4♦ T♥ 3♥. Your hand: no pair (A high). Draws: backdoor flush draw (needs two more ♥), 2 overcards.
+paired-board-river.png: Your cards: 9♣ 7♦ (offsuit). Board: 4♣ 6♣ 2♠ 9♦ Q♦. Your hand: second pair (9s, 7 kicker).
+pocket-sixes.png: Your cards: 6♣ 6♦ (pair). Board: none (preflop).
+six-left-slot.png: Your cards: 6♣ 4♥ (offsuit). Board: none (preflop).
+wheel-river.png: Your cards: A♦ T♠ (offsuit). Board: 3♠ 4♥ 2♦ 5♠ J♣. Your hand: straight (5-high).
