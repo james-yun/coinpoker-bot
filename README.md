@@ -227,6 +227,27 @@ Safety and limits:
 - Solves run one at a time. A watchdog stops any solve over `GRADE_MEM_GB` (default 6), and the solver refuses spots its estimate says won't fit.
 - Multiway pots, preflop lines the charts don't cover, and real stack sizes aren't modelled; those hands are skipped. The stats profile is approximate, built from flop c-bet, fold to c-bet and check-raise.
 
+## Testing against Pluribus's hands
+
+`library/library.py` plays the bot through the decisions Pluribus made in its 10,000 published six-max, 100bb hands against professionals (the PHH dataset; no solver, little memory):
+
+```
+git clone --depth 1 --filter=blob:none --sparse https://github.com/uoftcprg/phh-dataset ~/dev/third_party/phh-dataset
+cd ~/dev/third_party/phh-dataset && git sparse-checkout set data/pluribus
+library/library.py [--sample 240] [--street river] [--facing no|yes] [--variant prompts/x.sh] [--model m] [--seed 1]
+library/library.py --compare <results A.json> <results B.json>
+```
+
+Each Pluribus decision is described to the bot in text: position, the betting so far, the cards, the exact hand and draws, and the price of a call. Spots are scored two ways:
+- **Preflop spots the charts cover** are scored exactly from the chart's frequencies, for all of them (about 9,200), with the bot's adjustments applied. The charts agree with Pluribus 88% of the time.
+- **Everything else goes to the model,** on a sample stratified by street and by whether there's a bet to face. A run of 240 spots takes about 2 minutes.
+
+The report covers agreement on fold / check-call / bet-raise by street, a confusion table, how often bet sizes land in the same bucket, and the disagreements that matter most: folding a strong hand, or paying with nothing.
+
+**For comparing variants,** use the same `--seed` and `--sample`, and run the default twice: about 2 of 120 decisions flip with nothing changed. `prompts/no-thin-value.sh` is the strategy without the river thin-value rule. On 120 river spots it changed 8 decisions and left agreement where it was.
+
+**Agreement isn't winnings.** Pluribus mixes its strategy and played professionals, while several of the bot's rules exploit play-money players. Use it to find gross errors and to compare variants, not as a score to maximize.
+
 ## Tests
 
 `pokerbot test` (or `make test`) runs three groups:

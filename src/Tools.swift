@@ -84,6 +84,16 @@ func selfTest() -> Bool {
 
 func runCardTool(_ args: [String]) {
     if args.first == "--selftest" { exit(selfTest() ? 0 : 1) }
+    // --hand-strength: reads "<hole cards> | <board>" lines on stdin (e.g. "J♠ J♥ | T♦ 7♥ K♠") and prints
+    // the hand line the model gets ("Your hand: ... Draws: ..."), or an empty line preflop.
+    if args.first == "--hand-strength" {
+        while let line = readLine() {
+            let parts = line.split(separator: "|").map { $0.split(separator: " ").map(String.init) }
+            let text = parts.count == 2 ? handStrength(hole: parts[0], board: parts[1]) : nil
+            print(text ?? "")
+        }
+        return
+    }
     // --in-hand <preflop.png> <later.png>: positions (from the hand's first preflop screenshot) and the
     // seats still holding cards in a later screenshot, as JSON, for the solver grader.
     if args.first == "--in-hand", args.count == 3 {

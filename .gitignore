@@ -8,3 +8,4 @@ bench/results/
 build/
 dist/
 bench/spots.json
+library/results/

@@ -36,6 +36,8 @@ def small_png(path):
 
 
 def image_b64(path):
+    if path in ("", "-"):                    # a spot described only in text (e.g. the hand library)
+        return None
     small = small_png(path)
     with open(small, "rb") as f:
         data = base64.b64encode(f.read()).decode()
@@ -74,7 +76,7 @@ class ClaudeCLI:
 
     def ask(self, img, text):
         msg = {"type": "user", "message": {"role": "user", "content": [
-            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img}},
+            *([{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img}}] if img else []),
             {"type": "text", "text": text}]}}
         try:
             self.proc.stdin.write(json.dumps(msg) + "\n")
@@ -110,7 +112,7 @@ class AnthropicAPI:
 
     def ask(self, img, text):
         self.messages.append({"role": "user", "content": [
-            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img}},
+            *([{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img}}] if img else []),
             {"type": "text", "text": text}]})
         try:
             r = self.client.beta.messages.create(
@@ -145,7 +147,7 @@ class OpenAICompatible:
     def ask(self, img, text):
         self.messages.append({"role": "user", "content": [
             {"type": "text", "text": text},
-            {"type": "image_url", "image_url": {"url": "data:image/png;base64," + img}}]})
+            *([{"type": "image_url", "image_url": {"url": "data:image/png;base64," + img}}] if img else [])]})
         body = json.dumps({"model": MODEL, "messages": self.messages, "max_tokens": 1000}).encode()
         headers = {"Content-Type": "application/json"}
         if self.key:

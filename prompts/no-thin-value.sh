@@ -1,0 +1,2 @@
+# Variant: the strategy without the river thin-value rule (to measure what the rule changed).
+POKER_BASE="${POKER_BASE/ On the river when checked to, bet small (33) for thin value with second pair or weak top pair whenever worse hands can call, e.g. after the opponent gave up (checked back the turn, or c-bet then checked); stronger hands keep the value sizing above. Check instead when almost nothing worse calls, e.g. a pair below two board cards on a high or paired board./}"
