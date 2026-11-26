@@ -1,8 +1,8 @@
 # pokerbot
 
-![Pokerbot demo](https://github.com/user-attachments/assets/c4283759-0277-4510-bedf-b6e0ee380af4)
+![Pokerbot demo](https://github.com/user-attachments/assets/bf65fe56-c8d3-410d-a494-e8a8ca2f6e96)
 
-An autonomous player for CoinPoker 6-max No-Limit Hold'em tables, on macOS. It watches the table window and uses player statistics, GTO preflop charts and LLM (e.g. Claude Opus) to decide the action. Includes replay tools that test strategy changes on hands you've already played.
+An autonomous player for CoinPoker 6-max No-Limit Hold'em tables, on macOS. It watches the table window and uses player stats, GTO preflop charts and LLM (e.g. Claude Opus) postflop to decide the action. Includes replay tools that test strategy changes on hands you've already played.
 
 Use at your own risk.
 
