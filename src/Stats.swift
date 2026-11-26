@@ -37,7 +37,7 @@ struct PlayerStats {
 
 // Stats are kept in <output dir>/players.tsv for a day, so a restart doesn't open every player again
 // (they cover the last 15 days, so they barely change in a day). Lines: name, unix time, values, showdowns.
-let playersFile = (out.isEmpty ? "/tmp/poker" : out) + "/players.tsv"   // the card tools read the default
+let playersFile = (out.isEmpty ? NSHomeDirectory() + "/pokerbot-runs" : out) + "/players.tsv"   // the card tools read the default
 
 func loadPlayerStats(maxAge: Double = 86_400) -> [String: PlayerStats] {
     guard let text = try? String(contentsOfFile: playersFile, encoding: .utf8) else { return [:] }

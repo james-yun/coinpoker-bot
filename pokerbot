@@ -6,6 +6,7 @@
   pokerbot results [run-dir]                per-hand results of a run (default: the latest)
   pokerbot report [run-dir...]              compare your play with the bot's (default: latest run)
   pokerbot bench [...]                      replay benchmark (bench/run.py options)
+  pokerbot grade [run-dir...]               solver-graded EV loss of the bot's decisions (default: all runs)
   pokerbot tools --<tool> <png>...          the engine's tools on saved screenshots (pokerbot tools lists them)
   pokerbot build                            compile the engine
   pokerbot test                             self-tests: logic, card reader, decider
@@ -19,7 +20,7 @@ Settings come from ~/.config/pokerbot/config.toml (key = value lines; created on
   effort = "low"           Claude's thinking effort: low, medium, high
   base_url = ""            for openai, e.g. "http://localhost:11434/v1" (Ollama)
   api_key_env = ""         the environment variable holding the key (ANTHROPIC_API_KEY / OPENAI_API_KEY)
-  output_dir = "/tmp/poker"
+  output_dir = "~/pokerbot-runs"  where runs are saved (keep it out of /tmp: a restart clears /tmp)
   prompt = ""              a strategy variant file, e.g. "prompts/no-floats.sh"
 Environment variables (POKER_BACKEND, POKER_MODEL, ...) override the file.
 Command-line flags pass straight through to the underlying tool.
@@ -29,7 +30,7 @@ import glob, os, subprocess, sys
 ROOT = os.path.dirname(os.path.realpath(__file__))
 CONFIG = os.path.expanduser("~/.config/pokerbot/config.toml")
 DEFAULTS = {"backend": "claude-cli", "model": "opus", "effort": "low", "base_url": "", "api_key_env": "",
-            "output_dir": "/tmp/poker", "prompt": ""}
+            "output_dir": "~/pokerbot-runs", "prompt": ""}
 
 
 TOOLS = {"--read-cards": "<png>...  the cards, hand and draws read",
@@ -86,6 +87,7 @@ def main():
         print(__doc__); return
     cmd, rest = args[0], args[1:]
     cfg = load_config()
+    cfg["output_dir"] = os.path.expanduser(cfg["output_dir"])
     env = env_for(cfg)
     engine = os.path.join(ROOT, "engine")
     if cmd in ("play", "shadow"):
@@ -105,6 +107,12 @@ def main():
                 print(f"  {flag:<14} {what}")
             sys.exit(0 if not rest else 2)
         os.execve(engine, [engine, *rest], env)
+    elif cmd == "grade":
+        runs = [r for r in rest if not r.startswith("-")] or sorted(d for d in glob.glob(os.path.join(cfg["output_dir"], "20*")) if os.path.isdir(d))
+        flags = [r for r in rest if r.startswith("-")]
+        if "--compare" in rest:
+            runs, flags = [], rest
+        os.execve(sys.executable, [sys.executable, os.path.join(ROOT, "grade", "grade.py"), *runs, *flags], env)
     elif cmd == "build":
         if not glob.glob(os.path.join(ROOT, "src", "*.swift")):
             sys.exit("this is a prebuilt release with no sources; the engine is already built")

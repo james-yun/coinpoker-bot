@@ -90,7 +90,7 @@ model = "opus"              # opus / sonnet / haiku for Claude, or the endpoint'
 effort = "low"              # Claude's thinking effort: low, medium, high
 base_url = ""               # openai backend: e.g. "http://localhost:11434/v1" (Ollama), LM Studio, vLLM
 api_key_env = ""            # the environment variable holding the key (default ANTHROPIC_API_KEY / OPENAI_API_KEY)
-output_dir = "/tmp/poker"
+output_dir = "~/pokerbot-runs"     # not /tmp: a restart clears it
 prompt = ""                 # a strategy variant, e.g. "prompts/no-floats.sh"
 ```
 
@@ -194,11 +194,38 @@ POKER_BASE="$POKER_BASE Facing a bet with no pair, continue only with a flush dr
 
 The tools:
 - **`pokerbot bench [--variant prompts/x.sh] [--backend …] [--model …] [--effort …] [--repeat 3]`** scores the benchmark: `bench/spots.json`, a set of your past spots each with a clear right answer. A spot passes when every repeat picks an accepted action. A dozen spots take about 15 seconds. The benchmark is yours to build with `bench/add.py`. It isn't kept in git, because its screenshots and saved contexts show other players' names and stats.
-- **`pokerbot bench --all /tmp/poker/<run>...`** re-decides every model decision in those runs and saves the answers.
+- **`pokerbot bench --all ~/pokerbot-runs/<run>...`** re-decides every model decision in those runs and saves the answers.
 - **`bench/compare.py <a>.json <b>.json`** diffs two `--all` runs decision by decision. Run the default twice first: the model changes about 8% of its answers with nothing changed, mostly 33 vs 50 vs 75. Only differences well beyond that mean something.
 - **`bench/add.py <run>/<shot> --id <name> --expect <actions> --note "<why>"`** adds a spot. Expectations are actions (`fold`, `call`, `raise`, `33`, `50`, `75`, `max`) or groups: `bet`, `big` (75/max), `value` (50/75/max), `small`. Add only spots with a clear answer.
 
 Replay scores decisions, not winnings. What would have happened after a different action can't be known: opponents' hidden cards and their reactions to that action don't exist. Winnings come from the RESULT lines in real play.
+
+## Grading decisions with a solver
+
+`pokerbot grade [run...]` measures how much each postflop decision gave up, in big blinds, using the GTOpen solver. It needs a local GTOpen build with the grading example:
+
+```
+git clone https://github.com/MatthewPDingle/GTOpen ~/dev/third_party/GTOpen
+cp grade/grade_hand.rs ~/dev/third_party/GTOpen/crates/solver/examples/
+cd ~/dev/third_party/GTOpen && cargo build --release --example grade_hand
+```
+
+(`GTOPEN_GRADE` points at the binary if it's elsewhere.)
+
+For each heads-up hand whose preflop came from the charts:
+1. **The hand is rebuilt.** Ranges come from the charts: what each side opened, called or 3-bet with, plus the bot's actual hand. Pot and stacks come from the chart sizes at 100bb. The line comes from the saved decisions, with the opponent's bets sized from the price line.
+2. **Coarse flop solve.** One bet size per street, about 0.85 GB and 20–90s. It grades flop decisions and gives both players' ranges at the start of each later street on the line played.
+3. **Fine street solves.** Each turn and river decision is re-solved from its street with the bot's real sizes (33/75, raises 60), in seconds.
+
+Each decision gets two numbers:
+- **GTO loss** is the best action's EV minus the chosen action's EV, against a balanced opponent.
+- **Exploit loss** is the same after locking the opponent to his HUD stats (30+ showdowns) and re-solving. It matches how the bot is meant to play, since several rules deliberately exploit play-money tendencies that a balanced opponent would punish.
+
+The report gives the average loss per decision, the total, and the largest mistakes. `pokerbot grade --compare <bench --all A.json> <bench --all B.json>` puts a bb value on a strategy change. It reads, from the latest grade, the EV of both choices wherever two replays of the same hands differ.
+
+Safety and limits:
+- Solves run one at a time. A watchdog stops any solve over `GRADE_MEM_GB` (default 6), and the solver refuses spots its estimate says won't fit.
+- Multiway pots, preflop lines the charts don't cover, and real stack sizes aren't modelled; those hands are skipped. The stats profile is approximate, built from flop c-bet, fold to c-bet and check-raise.
 
 ## Tests
 
