@@ -1,8 +1,10 @@
 # pokerbot
 
-An autonomous player for the client's **play-money** 6-max No-Limit Hold'em tables, on macOS. It watches the table window, reads the cards and the action, decides with preflop charts and a language model, and clicks the buttons. It also has a shadow mode that records how you play, and replay tools that test strategy changes on hands you've already played.
+![Pokerbot demo](https://github.com/user-attachments/assets/c4283759-0277-4510-bedf-b6e0ee380af4)
 
-It's a personal project for play-money tables. Running a bot at real-money tables cheats the other players and breaks the site's rules. Don't.
+An autonomous player for CoinPoker 6-max No-Limit Hold'em tables, on macOS. It watches the table window and uses player statistics, GTO preflop charts and LLM (e.g. Claude Opus) to decide the action. Includes replay tools that test strategy changes on hands you've already played.
+
+Use at your own risk.
 
 ## Contents
 
