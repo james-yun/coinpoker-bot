@@ -107,6 +107,17 @@ struct PreflopRead {
     var why = ""                    // what was read, for logs
 }
 
+// Every dealt seat's position (UTG, HJ, ..., BB) from the button and the seats dealt in: a seat is
+// in if it's us or shows a tag or card backs. Read it on the hand's first preflop screenshot.
+func seatPositions(_ f: Frame) -> [Int: String]? {
+    let dealt = (0..<6).map { $0 == 0 || f.seatTag($0) != .none || f.hasCardBacks($0) }
+    let button = f.dealerSeat, players = dealt.filter { $0 }.count
+    guard button >= 0, dealt[button], players >= 2 else { return nil }
+    let fromSB = (1...6).map { (button + $0) % 6 }.filter { dealt[$0] }
+    let order = players == 2 ? [button, fromSB[0]] : Array(fromSB[2...]) + [fromSB[0], fromSB[1]]
+    return Dictionary(uniqueKeysWithValues: zip(order, chartPositions(players)))
+}
+
 func readPreflop(_ f: Frame) -> PreflopRead {
     var r = PreflopRead()
     let tags = (0..<6).map { f.seatTag($0) }

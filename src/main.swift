@@ -36,7 +36,7 @@ if decideCmd == nil && !manual {
 }
 // Card-template tools (see "card reading" below): --build-cards <labels.txt> <png-dir> <out.txt>,
 // --read-cards <png>...
-let cardTool = ["--build-cards", "--read-cards", "--read-preflop", "--results", "--read-hud", "--read-seats", "--context", "--selftest"].contains(argv.first ?? "")
+let cardTool = ["--build-cards", "--read-cards", "--read-preflop", "--results", "--read-hud", "--read-seats", "--context", "--selftest", "--in-hand"].contains(argv.first ?? "")
 let out = cardTool ? "" : argv.first ?? "/tmp/poker"
 // Each run saves into its own folder named by start time, so runs never overwrite or mix:
 // <out>/2026-11-22_095332/h007_flop_turn.png (+ .txt with the cards and the decider's answer).

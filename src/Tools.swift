@@ -84,6 +84,20 @@ func selfTest() -> Bool {
 
 func runCardTool(_ args: [String]) {
     if args.first == "--selftest" { exit(selfTest() ? 0 : 1) }
+    // --in-hand <preflop.png> <later.png>: positions (from the hand's first preflop screenshot) and the
+    // seats still holding cards in a later screenshot, as JSON, for the solver grader.
+    if args.first == "--in-hand", args.count == 3 {
+        let pos = withPNGPixels(args[1]) { px in seatPositions(Frame(base: px.base, width: px.width, height: px.height, stride: px.stride, top: 0)) } ?? nil
+        let inHand = withPNGPixels(args[2]) { px -> [Int] in
+            let f = Frame(base: px.base, width: px.width, height: px.height, stride: px.stride, top: 0)
+            return (1..<6).filter { f.hasCardBacks($0) }
+        } ?? []
+        guard let pos else { print("{}"); return }
+        let names = (try? JSONSerialization.data(withJSONObject: Dictionary(uniqueKeysWithValues: pos.map { (String($0.key), $0.value) })))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        print("{\"hero\": \"\(pos[0] ?? "?")\", \"players\": \(pos.count), \"positions\": \(names), \"in_hand\": [\(inHand.map { "\"\(pos[$0] ?? "?")\"" }.joined(separator: ", "))]}")
+        return
+    }
     // --context <png>...: the context line the model would get for a saved screenshot (cards, hand,
     // the price of a call, and saved stats of the players still in), as the replay benchmark uses it.
     if args.first == "--context" {

@@ -4,7 +4,7 @@
 
 An autonomous player for CoinPoker 6-max No-Limit Hold'em tables, on macOS. It watches the table window and uses player stats, GTO preflop charts and LLM (e.g. Claude Opus) postflop to decide the action. Includes replay tools that test strategy changes on hands you've already played.
 
-Use at your own risk.
+For play-money tables only. Running a bot at real-money tables cheats the other players and breaks the site's rules. Use at your own risk.
 
 ## Contents
 
