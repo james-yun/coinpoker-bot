@@ -30,7 +30,10 @@ CLAUDE_IDS = {"opus": "claude-opus-5-5", "sonnet": "claude-sonnet-5-5", "haiku":
 def small_png(path):
     """The screenshot shrunk to 742px wide (about 1,500 fewer input tokens, ~0.5s faster)."""
     out = os.path.join(tempfile.mkdtemp(), "table.png")
-    if subprocess.run(["sips", "-Z", "742", path, "--out", out], capture_output=True).returncode != 0:
+    path = os.path.expanduser(path)
+    r = subprocess.run(["sips", "-Z", "742", path, "--out", out], capture_output=True)
+    if r.returncode != 0 or not os.path.exists(out):     # sips can fail yet exit 0: send the original
+        os.rmdir(os.path.dirname(out)) if os.path.isdir(os.path.dirname(out)) and not os.listdir(os.path.dirname(out)) else None
         return path
     return out
 
