@@ -47,6 +47,8 @@ final class Monitor: NSObject, SCStreamOutput, SCStreamDelegate {
     var seatNames: [Int: String] = [:]  // seat -> name on its plate, read at each new hand
     var playerStats: [String: PlayerStats] = loadPlayerStats()   // by nameKey; read once per player
     var scanFailed: [String: Double] = [:]         // nameKey -> when reading its stats last failed
+    var scanTries: [String: Int] = [:]             // nameKey -> reads that didn't finish (max scanMaxTries)
+    let scanMaxTries = 3
     let hudQueue = DispatchQueue(label: "engine.hud")
 
     func stats(for name: String) -> PlayerStats? { playerStats.values.first { sameName(name, $0.name) } }
@@ -112,7 +114,10 @@ final class Monitor: NSObject, SCStreamOutput, SCStreamDelegate {
         guard !shadow else { return }
         let now = ProcessInfo.processInfo.systemUptime
         let todo = seatNames.sorted { $0.key < $1.key }.filter { seat, name in
-            if let t = scanFailed[nameKey(name)], now - t < 300 { return false }
+            // an unfinished read waits 30s, then 60s; after scanMaxTries the player is left alone
+            let tries = scanTries[nameKey(name)] ?? 0
+            if tries >= scanMaxTries { return false }
+            if let t = scanFailed[nameKey(name)], now - t < 30 * pow(2, Double(tries - 1)) { return false }
             return stats(for: name) == nil
         }.map { (seat: $0.key, name: $0.value) }
         if !scanning && scanOK && now - scanOKSince > 1.0 && decideCmd != nil && !todo.isEmpty {
@@ -127,6 +132,15 @@ final class Monitor: NSObject, SCStreamOutput, SCStreamDelegate {
     func scan(_ seats: [(seat: Int, name: String)], windowID: CGWindowID) {
         defer { sampleQueue.async { self.scanning = false } }
         var lastHud: CGImage?
+        func failed(_ name: String, _ why: String) {
+            sampleQueue.async {
+                let k = nameKey(name)
+                self.scanFailed[k] = ProcessInfo.processInfo.systemUptime
+                self.scanTries[k, default: 0] += 1
+                let n = self.scanTries[k]!
+                log("STATS: \(name) not read (\(why)); " + (n >= self.scanMaxTries ? "giving up on them" : "try \(n) of \(self.scanMaxTries)"))
+            }
+        }
         func hudNow(_ expect: String) -> (bounds: CGRect, values: [Int]?, showdowns: Int?)? {
             guard let h = hudWindow(), let img = captureWindow(h.id) else { return nil }
             lastHud = img
@@ -146,12 +160,8 @@ final class Monitor: NSObject, SCStreamOutput, SCStreamDelegate {
                 guard clickIn(content, namePlates[seat], above: windowID) else { break }
                 for _ in 0..<6 where got == nil { usleep(120_000); got = hudNow(name) }
             }
-            guard scanOK else { break }         // a hand started: not a failure, try again later
-            guard let first = got else {
-                sampleQueue.async { self.scanFailed[nameKey(name)] = ProcessInfo.processInfo.systemUptime }
-                if debug { log("DEBUG: stats for \(name) (seat \(seat)) not read") }
-                continue
-            }
+            guard scanOK else { failed(name, "our turn came"); break }
+            guard let first = got else { failed(name, "their stats window didn't open"); continue }
             // The showdown count shown right after switching players can still be the previous player's
             // (the name updates first), so it's only taken after clicking the Showdown tab.
             var st = PlayerStats(name: name, values: first.values ?? [], showdowns: nil, read: ProcessInfo.processInfo.systemUptime)
@@ -175,7 +185,7 @@ final class Monitor: NSObject, SCStreamOutput, SCStreamDelegate {
             }
             if st.values.isEmpty { switchTo(hudStatsTab) { !st.values.isEmpty } }
             switchTo(hudShowdownTab) { st.showdowns != nil }
-            guard !st.values.isEmpty else { continue }
+            guard !st.values.isEmpty else { failed(name, scanOK ? "the Stats tab wasn't read" : "our turn came"); if scanOK { continue } else { break } }
             if st.showdowns == nil, let img = lastHud {
                 // keep what the window showed, to see why
                 let png = runDir + "/stats_" + nameKey(name) + ".png"
