@@ -90,7 +90,10 @@ func facingLine(_ img: CGImage, raised: Bool = false, preflop: Bool = false) -> 
 // Lookalike letters (a Cyrillic "О" in a name the stats window spells with a Latin "O") count as the same.
 func nameKey(_ s: String) -> String {
     let latin = (s.applyingTransform(.toLatin, reverse: false) ?? s).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
-    return String(latin.lowercased().filter { $0.isLetter || $0.isNumber })
+    // Text recognition mixes up I, l, | and 1, and O and 0 ("Dani3I09205", "Dani3l09205", "Dani3|09205"):
+    // each group counts as one character.
+    let same: [Character: Character] = ["i": "l", "|": "l", "1": "l", "!": "l", "0": "o"]
+    return String(latin.lowercased().map { same[$0] ?? $0 }.filter { $0.isLetter || $0.isNumber })
 }
 func sameName(_ a: String, _ b: String) -> Bool {
     let x = nameKey(a), y = nameKey(b)

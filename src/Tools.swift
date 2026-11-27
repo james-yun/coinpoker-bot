@@ -40,6 +40,8 @@ func selfTest() -> Bool {
     check("sameName cyrillic", sameName("NОVA77", "NOVA77"), true)
     check("sameName truncated", sameName("LongNameExam...", "LongNameExample"), true)
     check("sameName different", sameName("Seat1", "Seat2"), false)
+    check("sameName I l |", sameName("Dani3|09205", "Dani3l09205") && sameName("Dani3I09205", "Dani3l09205"), true)
+    check("sameName O 0", sameName("COOS", "C00S"), true)
     // hand descriptions (each checked against the real table)
     let hands: [([String], [String], String)] = [
         (["Q♣", "J♣"], ["Q♦", "7♠", "8♦", "K♥"], "Your hand: second pair (Qs, J kicker). Draws: none."),

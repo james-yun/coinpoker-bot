@@ -132,6 +132,7 @@ final class Monitor: NSObject, SCStreamOutput, SCStreamDelegate {
     func scan(_ seats: [(seat: Int, name: String)], windowID: CGWindowID) {
         defer { sampleQueue.async { self.scanning = false } }
         var lastHud: CGImage?
+        var lastHudName: String?
         func failed(_ name: String, _ why: String) {
             sampleQueue.async {
                 let k = nameKey(name)
@@ -145,6 +146,7 @@ final class Monitor: NSObject, SCStreamOutput, SCStreamDelegate {
             guard let h = hudWindow(), let img = captureWindow(h.id) else { return nil }
             lastHud = img
             let r = parseHud(textLines(img))
+            lastHudName = r.name
             guard let n = r.name, sameName(expect, n) else { return nil }
             return (h.bounds, r.values, r.showdowns)
         }
@@ -156,12 +158,13 @@ final class Monitor: NSObject, SCStreamOutput, SCStreamDelegate {
             if let h = hudWindow(), h.bounds.contains(plate) { _ = clickIn(h.bounds, hudClose); usleep(300_000) }
             // A second click if the first only brought the table window forward.
             var got: (bounds: CGRect, values: [Int]?, showdowns: Int?)? = nil
+            lastHudName = nil
             for _ in 0..<2 where got == nil && scanOK {
                 guard clickIn(content, namePlates[seat], above: windowID) else { break }
                 for _ in 0..<6 where got == nil { usleep(120_000); got = hudNow(name) }
             }
             guard scanOK else { failed(name, "our turn came"); break }
-            guard let first = got else { failed(name, "their stats window didn't open"); continue }
+            guard let first = got else { failed(name, lastHudName.map { "the stats window showed \"\($0)\"" } ?? "their stats window didn't open"); continue }
             // The showdown count shown right after switching players can still be the previous player's
             // (the name updates first), so it's only taken after clicking the Showdown tab.
             var st = PlayerStats(name: name, values: first.values ?? [], showdowns: nil, read: ProcessInfo.processInfo.systemUptime)
